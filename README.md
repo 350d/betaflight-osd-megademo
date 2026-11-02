@@ -7,7 +7,8 @@ screen is drawn by the board's analog OSD chip (MAX7456 / AT7456E), the one that
 overlays battery voltage on the camera picture: 30 × 16 characters, white, black or clear. The
 music is a software AY-3-8910 playing a Pro Tracker 3 module on the same board.
 
-Released at Zoo Party 2026 (Wild Demo). This repository is a fork of
+Released at Zoo Party 2026 (Wild Demo). Full quality render [available on Youtube](https://youtu.be/_8Bu0jS38WI).
+This repository is a fork of
 [Betaflight](https://github.com/betaflight/betaflight) with the demo added; the original
 README is [README.betaflight.md](README.betaflight.md).
 
