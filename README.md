@@ -43,7 +43,7 @@ README is [README.betaflight.md](README.betaflight.md).
 
 ### HSYNC wire (required)
 
-<img width="2048" height="1536" alt="9C58B524-15B1-4723-A580-4F495100BCA8_1_102_o" src="https://github.com/user-attachments/assets/d560e6f5-1d97-4c44-929f-092dc0467d58" />
+<img width="4032" height="3024" alt="IMG_3060" src="https://github.com/user-attachments/assets/3fa1f13f-d302-48ed-8d07-0aae2e5ac783" />
 
 Solder **pin 18 (HSYNC) of the OSD chip** to a free pad of the flight controller that
 connects to **PA0, PA1, PA5, PA15 or PB3** (TIM2 channel 1 or 2). On many boards these are a
