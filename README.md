@@ -1,5 +1,7 @@
 # Betaflight OSD Megademo
 
+<img width="1920" height="1080" alt="vlcsnap-2026-10-15-14h30m40s165" src="https://github.com/user-attachments/assets/7f371b06-e6b9-4272-ba06-07277e0d98e2" />
+
 A real-time demoscene production that runs on an FPV drone flight controller. Everything on
 screen is drawn by the board's analog OSD chip (MAX7456 / AT7456E), the one that normally
 overlays battery voltage on the camera picture: 30 × 16 characters, white, black or clear. The
@@ -40,6 +42,8 @@ README is [README.betaflight.md](README.betaflight.md).
 ## Hardware
 
 ### HSYNC wire (required)
+
+<img width="2048" height="1536" alt="9C58B524-15B1-4723-A580-4F495100BCA8_1_102_o" src="https://github.com/user-attachments/assets/d560e6f5-1d97-4c44-929f-092dc0467d58" />
 
 Solder **pin 18 (HSYNC) of the OSD chip** to a free pad of the flight controller that
 connects to **PA0, PA1, PA5, PA15 or PB3** (TIM2 channel 1 or 2). On many boards these are a
