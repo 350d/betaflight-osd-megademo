@@ -134,6 +134,13 @@ COMMON_SRC = \
             fc/runtime_config.c \
             fc/stats.c \
             io/beeper.c \
+            drivers/ay_pwm.c \
+            drivers/ay_synth.c \
+            io/chiptune.c \
+            io/chiptune_tracks.c \
+            io/pt3.c \
+            io/osd_demo.c \
+            io/osd_demo_defaults.c \
             io/piniobox.c \
             io/serial.c \
             io/serial_feature_map.c \
@@ -438,6 +445,7 @@ SIZE_OPTIMISED_SRC += \
 
 
 SPEED_OPTIMISED_SRC += \
+            drivers/ay_synth.c \
             drivers/bus_spi.c \
             drivers/serial_uart.c \
             drivers/accgyro/accgyro_mpu.c \
@@ -607,3 +615,4 @@ endif
 # platform mk adds a CAN driver (currently STM32G4 / H7 / C5). This keeps
 # non-CAN targets from having to compile a ~2k-line external library whose
 # symbols would never link.
+

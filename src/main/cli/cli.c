@@ -114,6 +114,9 @@ bool cliMode = false;
 
 #include "io/asyncfatfs/asyncfatfs.h"
 #include "io/beeper.h"
+#ifdef USE_OSD_DEMO
+#include "io/osd_demo.h"
+#endif
 #include "io/dronecan/dronecan.h"
 #include "io/dronecan/dronecan_msg.h"
 #include "io/dronecan/dronecan_nodes.h"
@@ -4952,6 +4955,61 @@ RAM_CODE static void cliPlaySound(const char *cmdName, char *cmdline)
 }
 #endif
 
+#ifdef USE_OSD_DEMO
+static void cliOsdDemo(const char *cmdName, char *cmdline)
+{
+    UNUSED(cmdName);
+
+    char *saveptr;
+    const char *cmd = strtok_r(cmdline, " ", &saveptr);
+
+    if (cmd && strcasecmp(cmd, "stop") == 0) {
+        osdDemoStop();
+        cliPrintLine("osd_demo: stopped");
+        return;
+    }
+    if (ARMING_FLAG(ARMED)) {
+        cliPrintLine("osd_demo: disarm first");
+        return;
+    }
+    if (!cmd || strcasecmp(cmd, "play") == 0) {
+        if (osdDemoStart()) {
+            cliPrintLine("osd_demo: playing, `osd_demo stop` ends it");
+        } else {
+            cliPrintLinef("osd_demo: failed: %s", osdDemoStartLastError());
+        }
+        return;
+    }
+    if (strcasecmp(cmd, "font") == 0) {
+        const char *arg = strtok_r(NULL, " ", &saveptr);
+        const bool restore = arg && strcasecmp(arg, "restore") == 0;
+        if (restore && osdDemoIsActive()) {
+            cliPrintLine("osd_demo font restore: `osd_demo stop` first (it restores the font anyway)");
+            return;
+        }
+        const char *note;
+        uint8_t mark;
+        uint16_t backupWrites, restoreWrites;
+        osdDemoFontStatus(restore, &note, &mark, &backupWrites, &restoreWrites);
+        cliPrintLinef("osd_demo font: backup in the upper glyph bank: %s",
+                      mark == 0xC1 ? "valid, font in place" : mark == 0xD1 ? "valid, demo font installed" : "none");
+        cliPrintLinef("  last start: %s (%u glyphs written), last restore: %u glyphs written",
+                      note, backupWrites, restoreWrites);
+        return;
+    }
+    if (strncasecmp(cmd, "scene", 5) == 0 && cmd[5]) {
+        const int scene = atoi(cmd + 5);
+        if (scene >= 0 && scene < OSD_DEMO_SCENE_COUNT && osdDemoStartScene((uint8_t)scene)) {
+            cliPrintLinef("osd_demo: scene %d held, `osd_demo stop` ends it", scene);
+        } else {
+            cliPrintLinef("osd_demo %s: failed: %s", cmd, osdDemoStartLastError());
+        }
+        return;
+    }
+    cliPrintLine("usage: osd_demo [play | stop | scene<0..14> | font [restore]]");
+}
+#endif
+
 RAM_CODE static void cliProfile(const char *cmdName, char *cmdline)
 {
     if (isEmpty(cmdline)) {
@@ -8637,6 +8695,9 @@ const clicmd_t cmdTable[] = {
 #endif
 #if defined(USE_BOARD_INFO)
     CLI_COMMAND_DEF("board_name", "get / set the name of the board model", "[board name]", cliBoardName),
+#endif
+#ifdef USE_OSD_DEMO
+    CLI_COMMAND_DEF("osd_demo", "OSD megademo on the MAX7456 / AT7456", "[play | stop | scene<0..14> | font [restore]]", cliOsdDemo),
 #endif
 #ifdef USE_LED_STRIP_STATUS_MODE
         CLI_COMMAND_DEF("color", "configure colors", NULL, cliColor),

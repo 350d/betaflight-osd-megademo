@@ -65,6 +65,9 @@
 
 #include "io/asyncfatfs/asyncfatfs.h"
 #include "io/beeper.h"
+#ifdef USE_CHIPTUNE
+#include "io/chiptune.h"
+#endif
 #include "io/dashboard.h"
 #include "io/dronecan/dronecan.h"
 #include "io/flashfs.h"
@@ -410,6 +413,11 @@ task_attribute_t task_attributes[TASK_COUNT] = {
     [TASK_BEEPER] = DEFINE_TASK("BEEPER", NULL, NULL, beeperUpdate, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
 #endif
 
+#ifdef USE_CHIPTUNE
+    // The music itself runs in the AY output's render interrupt; the task watches it.
+    [TASK_CHIPTUNE] = DEFINE_TASK("CHIPTUNE", NULL, NULL, chiptuneUpdate, TASK_PERIOD_HZ(1000), TASK_PRIORITY_HIGH),
+#endif
+
 #ifdef USE_GPS
     [TASK_GPS] = DEFINE_TASK("GPS", NULL, NULL, gpsUpdate, TASK_PERIOD_HZ(TASK_GPS_RATE), TASK_PRIORITY_MEDIUM), // Required to prevent buffer overruns if running at 115200 baud (115 bytes / period < 256 bytes buffer)
 #endif
@@ -610,6 +618,10 @@ void tasksInit(void)
 
 #ifdef USE_BEEPER
     setTaskEnabled(TASK_BEEPER, true);
+#endif
+
+#ifdef USE_CHIPTUNE
+    setTaskEnabled(TASK_CHIPTUNE, false);
 #endif
 
 #ifdef USE_GPS

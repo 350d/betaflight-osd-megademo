@@ -28,6 +28,10 @@
 
 #include "statusindicator.h"
 
+#ifdef USE_CHIPTUNE
+#include "io/chiptune.h"
+#endif
+
 static uint32_t warningLedTimer = 0;
 
 typedef enum {
@@ -79,6 +83,12 @@ void warningLedRefresh(void)
 
 void warningLedUpdate(void)
 {
+#ifdef USE_CHIPTUNE
+    // The status LEDs flash to the drums while the music plays
+    if (chiptuneIsPlaying()) {
+        return;
+    }
+#endif
     uint32_t now = micros();
 
     if ((int32_t)(now - warningLedTimer) < 0) {

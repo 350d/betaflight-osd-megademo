@@ -30,12 +30,14 @@
 #include "drivers/display.h"
 #include "drivers/max7456.h"
 #include "drivers/osd.h"
+#include "drivers/time.h"
 
 #include "config/config.h"
 
 #include "fc/runtime_config.h"
 
 #include "io/displayport_max7456.h"
+#include "io/osd_demo.h"
 
 #include "osd/osd.h"
 
@@ -65,8 +67,11 @@ static int clearScreen(displayPort_t *displayPort, displayClearOption_e options)
     UNUSED(displayPort);
     UNUSED(options);
 
-    max7456Invert(displayPortProfileMax7456()->invert);
-    max7456Brightness(displayPortProfileMax7456()->blackBrightness, displayPortProfileMax7456()->whiteBrightness);
+    // The OSD task clears its canvas while the demo runs: the demo owns the row brightness.
+    if (!osdDemoIsActive()) {
+        max7456Invert(displayPortProfileMax7456()->invert);
+        max7456Brightness(displayPortProfileMax7456()->blackBrightness, displayPortProfileMax7456()->whiteBrightness);
+    }
 
     max7456ClearScreen();
 
@@ -77,6 +82,10 @@ static int clearScreen(displayPort_t *displayPort, displayClearOption_e options)
 static bool drawScreen(displayPort_t *displayPort)
 {
     UNUSED(displayPort);
+    // The demo owns Display SRAM and pushes its own frames.
+    if (osdDemoIsActive()) {
+        return false;
+    }
     return max7456DrawScreen();
 }
 
@@ -91,6 +100,9 @@ static int writeString(displayPort_t *displayPort, uint8_t x, uint8_t y, uint8_t
     UNUSED(displayPort);
     UNUSED(attr);
 
+    if (osdDemoIsActive()) {
+        return 0; // the OSD's own text (blinking warnings) would land in the demo's frame
+    }
     max7456Write(x, y, text);
 
     return 0;
@@ -101,6 +113,9 @@ static int writeChar(displayPort_t *displayPort, uint8_t x, uint8_t y, uint8_t a
     UNUSED(displayPort);
     UNUSED(attr);
 
+    if (osdDemoIsActive()) {
+        return 0;
+    }
     max7456WriteChar(x, y, c);
 
     return 0;
@@ -130,9 +145,13 @@ static void redraw(displayPort_t *displayPort)
 static int heartbeat(displayPort_t *displayPort)
 {
     UNUSED(displayPort);
-
     // (Re)Initialize MAX7456 at startup or stall is detected.
-    return max7456ReInitIfRequired(false);
+    const bool reinited = max7456ReInitIfRequired(false);
+#ifdef USE_OSD_DEMO
+    osdDemoPoll(micros()); // the demo ticks here, also after a stall reinit
+#endif
+
+    return reinited;
 }
 
 static uint32_t txBytesFree(const displayPort_t *displayPort)

@@ -22,6 +22,23 @@
 
 #include "build/version.h"
 
+#ifdef OSD_DEMO_BUILD
+// OSD megademo build: the slot engine is STM32F4 only. Its RAM comes from blackbox (and with it
+// USB mass storage) and ESC passthrough.
+#if defined(USE_MAX7456) && defined(STM32F4)
+#define USE_OSD_DEMO
+#define USE_CHIPTUNE
+#ifndef USE_TARGET_CONFIG
+#define USE_TARGET_CONFIG    // the demo's defaults: io/osd_demo_defaults.c
+#define USE_OSD_DEMO_DEFAULTS
+#endif
+#endif
+#undef USE_BLACKBOX
+#undef USE_USB_MSC
+#undef USE_ESCSERIAL
+#undef USE_ESCSERIAL_SIMONK
+#endif
+
 /*
 
     The purpose of this file is to enable / disable any firmware "gates" for features and drivers

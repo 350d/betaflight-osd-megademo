@@ -1,0 +1,15 @@
+Betaflight OSD Megademo
+Copyright (C) 2026 Vladimir Sobolev (350D)
+
+The OSD megademo code in this repository (the demo scenes and raster engine, the MAX7456 /
+AT7456E driver changes, the AY-3-8910 synth, PT3 player and PWM output, the host renderer and
+the generators in demo/) is licensed under the GNU General Public License version 3, like
+Betaflight, with the following additional term under section 7(b) of that license:
+
+  When you convey this program, or a work based on it, keep this attribution in the source
+  and in the documentation or credits of what you convey:
+  "OSD megademo by 350D - https://github.com/350d/betaflight-osd-megademo"
+
+The music module "Summer Steps" by E.J.Kot (demo/music/01_Summer_Steps.pt3, and its copy in
+src/main/io/chiptune_tracks.c) is used with the author's permission and is not licensed under
+the GPL. All rights reserved by its author.

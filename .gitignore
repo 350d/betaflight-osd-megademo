@@ -66,3 +66,8 @@ eeprom.bin
 AGENTS.md
 CLAUDE.md
 /tasks
+
+# OSD megademo host renderer
+/demo/render/*.o
+/demo/render/render
+/demo/*.mp4
