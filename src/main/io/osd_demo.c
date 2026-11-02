@@ -56,6 +56,9 @@
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
 
+#ifdef USE_I2C
+#include "pg/bus_i2c.h"
+#endif
 #include "pg/displayport_profiles.h"
 #include "pg/max7456.h"
 #include "drivers/serial.h"
@@ -3449,10 +3452,13 @@ typedef enum {
     IRQ_EV_ZEND,
 } osdDemoIrqEvent_e;
 
+#if defined(STM32F7)
+void *timerFindTimerHandle(timerResource_t *tim); // timer_hal.c (no header)
+#endif
 static const timerHardware_t osdDemoIrqTimHw = {
     .tim = (timerResource_t *)TIM5,
     .tag = IO_TAG_NONE,
-    .channel = TIM_Channel_1,
+    .channel = 0, // channel 1 (TIM_Channel_1 / TIM_CHANNEL_1)
 };
 static timerEdgeHandlerRec_t osdDemoIrqEdgeRec;
 static volatile uint8_t irqEvent;
@@ -3500,7 +3506,7 @@ static void osdDemoIrqArm(uint32_t dwtAt)
         d = minLead; // already due: fire as soon as possible
     }
     const uint32_t dt = (uint32_t)(((uint64_t)(uint32_t)d * irqTimRatioQ16) >> 16);
-    tim->SR = (uint16_t)~TIM_IT_CC1;
+    tim->SR = (uint16_t)~TIM_SR_CC1IF;
     tim->CCR1 = tim->CNT + dt;
 }
 
@@ -3730,7 +3736,7 @@ static void osdDemoIrqStop(void)
     }
     irqRunning = false;
     *irqScene->armed = false;
-    TIM_ITConfig(TIM5, TIM_IT_CC1, DISABLE);
+    TIM5->DIER &= ~TIM_DIER_CC1IE;
     irqRbFlash = 0;
     if (max7456RbHeld()) {
         max7456RbHold(false, 0);
@@ -3784,29 +3790,27 @@ static bool osdDemoIrqStart(const osdDemoIrqScene_t *scene)
         mgByteTicksQ8 = (clockMicrosToCycles(30) << 8) / 36u;
     }
 
-    // TIM5: free-running 32-bit at the timer clock; CC1 = next event time.
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
-    TIM_TimeBaseInitTypeDef tb;
-    TIM_TimeBaseStructInit(&tb);
-    tb.TIM_Prescaler = 0;
-    tb.TIM_Period = 0xFFFFFFFFu;
-    tb.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit(TIM5, &tb);
-    TIM_OCInitTypeDef oc;
-    TIM_OCStructInit(&oc);
-    oc.TIM_OCMode = TIM_OCMode_Timing;
-    TIM_OC1Init(TIM5, &oc);
-    TIM_Cmd(TIM5, ENABLE);
+    // TIM5: free-running 32-bit at the timer clock; CC1 = next event time (frozen, no pin).
+    RCC->APB1ENR |= RCC_APB1ENR_TIM5EN;
+    __DSB();
+    TIM5->CR1 = 0;
+    TIM5->PSC = 0;
+    TIM5->ARR = 0xFFFFFFFFu;
+    TIM5->CCER &= ~(TIM_CCER_CC1E | TIM_CCER_CC1P);
+    TIM5->CCMR1 &= ~0x00FFu;
+    TIM5->CCR1 = 0;
+    TIM5->EGR = TIM_EGR_UG;
+    TIM5->CR1 = TIM_CR1_CEN;
+#if defined(STM32F7)
+    // The HAL timer driver reaches the timer through its handle, set only by its own time base.
+    ((TIM_HandleTypeDef *)timerFindTimerHandle(osdDemoIrqTimHw.tim))->Instance = TIM5;
+#endif
     irqTimRatioQ16 = (uint32_t)(((uint64_t)timerClock(&osdDemoIrqTimHw) << 16)
                                 / ((uint64_t)clockMicrosToCycles(1) * 1000000u));
 
     // Above the audio IRQs (the boosted fallback audio IRQ drops to timer priority meanwhile).
-    NVIC_InitTypeDef nvic;
-    nvic.NVIC_IRQChannel = TIM5_IRQn;
-    nvic.NVIC_IRQChannelPreemptionPriority = NVIC_PRIORITY_BASE(NVIC_PRIO_MAX);
-    nvic.NVIC_IRQChannelSubPriority = NVIC_PRIORITY_SUB(NVIC_PRIO_MAX);
-    nvic.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&nvic);
+    NVIC_SetPriority(TIM5_IRQn, NVIC_PRIO_MAX >> (8u - __NVIC_PRIO_BITS));
+    NVIC_EnableIRQ(TIM5_IRQn);
 
     max7456MidGlyphSpiBegin();
     // One blocking VSYNC lock seeds the prediction; from then on only short windows.
@@ -4816,7 +4820,7 @@ static void osdDemoHsCapStop(void);
 static bool osdDemoHsCapWait(uint32_t *edgeDwt, uint32_t timeoutTicks);
 
 // The pins the OSD chip's HSYNC output (MAX7456 / AT7456 pin 18) can go to: TIM2 CH1 / CH2 (AF1
-// on every F4). The first free one with HSYNC on it is used.
+// on every F4 / F7). The first free one with HSYNC on it is used.
 typedef struct osdDemoHsPin_s {
     ioTag_t tag;
     uint8_t ch;
@@ -4833,7 +4837,7 @@ static void osdDemoHsCapStart(const osdDemoHsPin_t *pin)
     IOInit(io, OWNER_TIMER, 0);
     hsPin = pin;
     hsCapClaimed = true;
-    IOConfigGPIOAF(io, IO_CONFIG(GPIO_Mode_AF, GPIO_Speed_50MHz, GPIO_OType_PP, GPIO_PuPd_UP), GPIO_AF_TIM2);
+    IOConfigGPIOAF(io, IOCFG_AF_PP_UP, 1); // AF1 = TIM2
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
     __DSB();
     // TIM2 / TIM3 / TIM5 (all APB1) ticks per CPU tick, Q16
@@ -4936,7 +4940,7 @@ static uint32_t zdmaC;       // slot 0's time into the line (TIM3 CCR2)
 static uint32_t zdmaSlotInvQ24, zdmaNsQ16; // slot division as a multiply; ns → ticks
 // Buffer and stats.
 static uint16_t zdmaLine;    // next line to load into the buffer
-static uint16_t zdmaBuf[2 * ZDMA_LINES * ZDMA_SLOTS_MAX];
+static DMA_DATA_ZERO_INIT uint16_t zdmaBuf[2 * ZDMA_LINES * ZDMA_SLOTS_MAX]; // F7: in DTCM, past the D-cache
 // Glyph window of a cell: 980 ns after the beam left it in line L−1 … 4900 ns before it gets
 // there in line L.
 #define ZDMA_WIN_START_NS 980
@@ -5191,6 +5195,14 @@ static void osdDemoPadName(ioTag_t tag, char *buf, size_t size)
             return;
         }
     }
+#ifdef USE_I2C
+    for (unsigned i = 0; i < I2CDEV_COUNT; i++) {
+        if (i2cConfig(i)->ioTagScl == tag || i2cConfig(i)->ioTagSda == tag) {
+            tfp_sprintf(buf, "%s (P%c%u)", i2cConfig(i)->ioTagScl == tag ? "SCL" : "SDA", 'A' + DEFIO_TAG_GPIOID(tag), DEFIO_TAG_PIN(tag));
+            return;
+        }
+    }
+#endif
 #ifdef USE_LED_STRIP
     if (ledStripConfig()->ioTag == tag) {
         tfp_sprintf(buf, "LED (P%c%u)", 'A' + DEFIO_TAG_GPIOID(tag), DEFIO_TAG_PIN(tag));
@@ -5199,6 +5211,19 @@ static void osdDemoPadName(ioTag_t tag, char *buf, size_t size)
 #endif
     UNUSED(size);
     tfp_sprintf(buf, "P%c%u", 'A' + DEFIO_TAG_GPIOID(tag), DEFIO_TAG_PIN(tag));
+}
+
+// Where the sound goes (claimed now if the music has not started yet): HSYNC has its pad by then.
+const char *osdDemoSoundPad(void)
+{
+    static char info[40];
+    char pad[24];
+    if (!ayPwmClaim()) {
+        return "no sound: no free LED / I2C / UART pad on a timer with DMA";
+    }
+    osdDemoPadName(ayPwmPin(), pad, sizeof(pad));
+    tfp_sprintf(info, "sound on %s", pad);
+    return info;
 }
 
 // No HSYNC found: the free pads it could go to.
@@ -5259,6 +5284,9 @@ static uint32_t pbBuiltT;
 #elif defined(STM32F446xx)
 #define PB_BUILD_IRQ         SPI4_IRQn
 #define PB_BUILD_IRQ_HANDLER SPI4_IRQHandler
+#elif defined(STM32F7)
+#define PB_BUILD_IRQ         RNG_IRQn
+#define PB_BUILD_IRQ_HANDLER RNG_IRQHandler
 #else
 #define PB_BUILD_IRQ         HASH_RNG_IRQn
 #define PB_BUILD_IRQ_HANDLER HASH_RNG_IRQHandler

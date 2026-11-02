@@ -101,6 +101,8 @@ void ayPwmResetFrameClock(void) { aySynthResetFrameClock(); }
 void ayPwmSetRegs(const uint8_t regs[16]) { aySynthApplyRegs(regs); }
 void ayPwmApplyRegsIsr(const uint8_t regs[16]) { aySynthApplyRegs(regs); }
 void ayPwmSetClockErrorPpm(int32_t ppm) { (void)ppm; }
+bool ayPwmClaim(void) { return true; }
+ioTag_t ayPwmPin(void) { return 0; }
 
 // --- The chip ----------------------------------------------------------------------------------
 hostChip_t chip;

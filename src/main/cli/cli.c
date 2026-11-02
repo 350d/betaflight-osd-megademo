@@ -4975,6 +4975,7 @@ static void cliOsdDemo(const char *cmdName, char *cmdline)
     if (!cmd || strcasecmp(cmd, "play") == 0) {
         if (osdDemoStart()) {
             cliPrintLine("osd_demo: playing, `osd_demo stop` ends it");
+            cliPrintLinef("osd_demo: %s", osdDemoSoundPad());
         } else {
             cliPrintLinef("osd_demo: failed: %s", osdDemoStartLastError());
         }

@@ -35,6 +35,7 @@
 bool osdDemoStart(void);                 // the whole demo, once
 bool osdDemoStartScene(uint8_t scene);   // one scene, held
 const char *osdDemoStartLastError(void); // set when a start returns false
+const char *osdDemoSoundPad(void);       // "sound on <pad>" or why not
 void osdDemoStop(void);
 bool osdDemoIsActive(void);
 void osdDemoPoll(timeUs_t currentTimeUs); // OSD heartbeat: mode switch, the demo's tick

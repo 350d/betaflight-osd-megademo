@@ -25,7 +25,7 @@
 
 #include "platform.h"
 
-#if defined(USE_CHIPTUNE) && defined(STM32F4)
+#if defined(USE_CHIPTUNE) && (defined(STM32F4) || defined(STM32F7))
 
 #include "build/atomic.h"
 
@@ -37,9 +37,15 @@
 #include "drivers/dma.h"
 #include "drivers/dma_reqmap.h"
 #include "drivers/io.h"
+#include "drivers/motor.h"
 #include "drivers/nvic.h"
 #include "drivers/pwm_output.h"
+#include "drivers/serial.h"
+#include "drivers/serial_resource.h"
 #include "drivers/timer.h"
+
+#include "pg/bus_i2c.h"
+#include "pg/motor.h"
 
 #include "platform/dma.h"
 #include "platform/timer.h"
@@ -111,57 +117,114 @@ static bool ayTimerHasRcr(const TIM_TypeDef *tim)
     return tim == TIM1;
 }
 
-// The pin's timer and a DMA stream for it: the update request on an advanced timer (for the
-// 128 kHz carrier), else the channel's compare request.
-static bool ayClaim(void)
+// A DMA stream for the timer channel: the update request on an advanced timer (for the 128 kHz
+// carrier) when asked for, else the channel's compare request, on any free option.
+static bool ayClaimDma(const timerHardware_t *timer, bool update)
+{
+    if (update) {
+#ifdef USE_TIMER_DMA
+        if (ayTimerHasRcr((const TIM_TypeDef *)timer->tim) && timer->dmaTimUPRef
+            && dmaAllocate(dmaGetIdentifier(timer->dmaTimUPRef), OWNER_BEEPER, 0)) {
+            ayDmaRef = timer->dmaTimUPRef;
+            ayDmaChannel = timer->dmaTimUPChannel;
+            ayDmaUpdate = true;
+            return true;
+        }
+#endif
+        return false;
+    }
+    for (int opt = 0; opt < MAX_TIMER_DMA_OPTIONS; opt++) {
+        const dmaChannelSpec_t *spec = dmaGetChannelSpecByTimerValue(timer->tim, timer->channel, opt);
+        if (spec && dmaAllocate(dmaGetIdentifier(spec->ref), OWNER_BEEPER, 0)) {
+            ayDmaRef = spec->ref;
+            ayDmaChannel = spec->channel;
+            ayDmaUpdate = false;
+            return true;
+        }
+    }
+    return false;
+}
+
+// The pad's timer channels, the OSD demo's raster timers (TIM2 / TIM3 / TIM5) left out. A pad
+// owned by `owner` is taken over as if free.
+static const timerHardware_t *ayClaimTimerFrom(ioTag_t tag, bool update, resourceOwner_e owner)
+{
+    const IO_t io = IOGetByTag(tag);
+    if (!io || (IOGetOwner(io) != OWNER_FREE && IOGetOwner(io) != owner)) {
+        return NULL;
+    }
+    for (unsigned i = 1; ; i++) {
+        const timerHardware_t *timer = timerGetByTagAndIndex(tag, i);
+        if (!timer) {
+            return NULL;
+        }
+        const TIM_TypeDef *tim = (const TIM_TypeDef *)timer->tim;
+        if (tim != TIM2 && tim != TIM3 && tim != TIM5 && ayClaimDma(timer, update)) {
+            return timer;
+        }
+    }
+}
+
+static const timerHardware_t *ayClaimTimer(ioTag_t tag, bool update)
+{
+    return ayClaimTimerFrom(tag, update, OWNER_FREE);
+}
+
+// The sound's pad: the LED strip pad (or AY_PWM_PIN), else an I2C pad (the demo turns the baro
+// off; some AIO boards bring out no UART pad with a usable timer), else the first free UART pad
+// with a timer and DMA for it, a TIM1 / TIM8 one with the carrier first.
+bool ayPwmClaim(void)
 {
     if (ayTimer) {
         return true;
     }
+    const timerHardware_t *timer = NULL;
 #ifdef AY_PWM_PIN
-    const ioTag_t tag = IO_TAG(AY_PWM_PIN);
-#else
-    const ioTag_t tag = IO_TAG_NONE;
-#endif
-    const timerHardware_t *timer = timerAllocate(tag, OWNER_BEEPER, 0);
-    const IO_t io = IOGetByTag(tag);
-    if (!timer || !io) {
-        return false;
-    }
-    dmaResource_t *ref = NULL;
-    uint32_t channel = 0;
-    bool update = false;
-#ifdef USE_TIMER_DMA
-    if (ayTimerHasRcr((const TIM_TypeDef *)timer->tim) && timer->dmaTimUPRef) {
-        ref = timer->dmaTimUPRef;
-        channel = timer->dmaTimUPChannel;
-        update = true;
+    timer = ayClaimTimer(IO_TAG(AY_PWM_PIN), true);
+    if (!timer) {
+        timer = ayClaimTimer(IO_TAG(AY_PWM_PIN), false);
     }
 #endif
-    if (!ref) {
-        const dmaChannelSpec_t *spec = dmaGetChannelSpecByTimer(timer);
-        if (spec) {
-            ref = spec->ref;
-            channel = spec->channel;
+#ifdef USE_I2C
+    for (unsigned i = 0; i < I2CDEV_COUNT && !timer; i++) {
+        timer = ayClaimTimerFrom(i2cConfig(i)->ioTagScl, false, OWNER_I2C_SCL);
+        if (!timer) {
+            timer = ayClaimTimerFrom(i2cConfig(i)->ioTagSda, false, OWNER_I2C_SDA);
         }
     }
-    if (!ref) {
+#endif
+    for (int pass = 0; pass < 2 && !timer; pass++) {
+        for (unsigned i = 0; i < RESOURCE_UART_COUNT && !timer; i++) {
+            timer = ayClaimTimer(serialPinConfig()->ioTagTx[RESOURCE_UART_OFFSET + i], pass == 0);
+            if (!timer) {
+                timer = ayClaimTimer(serialPinConfig()->ioTagRx[RESOURCE_UART_OFFSET + i], pass == 0);
+            }
+        }
+    }
+    if (!timer) {
         return false;
     }
-    const dmaIdentifier_e id = dmaGetIdentifier(ref);
-    if (!dmaAllocate(id, OWNER_BEEPER, 0)) {
-        return false;
+    // A motor on the same timer: the sound takes its time base (the demo needs a reboot anyway).
+    for (unsigned i = 0; i < MAX_SUPPORTED_MOTORS; i++) {
+        const timerHardware_t *motor = timerGetConfiguredByTag(motorConfig()->dev.ioTags[i]);
+        if (motor && motor->tim == timer->tim && motorIsEnabled()) {
+            motorDisable();
+        }
     }
+    const dmaIdentifier_e id = dmaGetIdentifier(ayDmaRef);
     dmaEnable(id);
     dmaSetHandler(id, ayDmaIrqHandler, AY_DMA_IRQ_PRIO, 0);
+    const IO_t io = IOGetByTag(timer->tag);
     IOInit(io, OWNER_BEEPER, 0);
     IOConfigGPIOAF(io, IOCFG_AF_PP, timer->alternateFunction);
     ayTimer = timer;
-    ayDmaRef = ref;
-    ayDmaChannel = channel;
-    ayDmaUpdate = update;
     ayDmaDesc = dmaGetDescriptorByIdentifier(id);
     return true;
+}
+
+ioTag_t ayPwmPin(void)
+{
+    return ayTimer ? ayTimer->tag : IO_TAG_NONE;
 }
 
 static uint32_t ayDmaSource(void)
@@ -181,7 +244,7 @@ static void ayConfigureSynth(void)
 bool ayPwmStart(void)
 {
     ayPwmStop();
-    if (!ayClaim()) {
+    if (!ayPwmClaim()) {
         return false;
     }
     TIM_TypeDef *tim = (TIM_TypeDef *)ayTimer->tim;

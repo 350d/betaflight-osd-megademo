@@ -55,7 +55,7 @@ static void max7456CommitShadowCell(uint16_t addr, uint8_t glyph, bool invert);
 // OSD demo zone session (HSYNC wired): the slot engine's DMA owns SPI and holds CS low for the
 // whole active field. Any other driver access then would cut into its word stream and raise CS
 // (the chip loses its state: random breaks even on a still picture) — dropped and counted.
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32F7)
 static bool zone16;
 static inline bool max7456BusOwnedBySession(void)
 {
@@ -1333,7 +1333,32 @@ static uint16_t midGlyphSavedDiv;
 static bool midGlyphSavedDma;
 #endif
 
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32F7)
+static void max7456SpiDrain(SPI_TypeDef *spi)
+{
+    while (!(spi->SR & SPI_SR_TXE)) {
+    }
+#if defined(STM32F7)
+    while (spi->SR & SPI_SR_FTLVL) {
+    }
+#endif
+    while (spi->SR & SPI_SR_BSY) {
+    }
+}
+
+// Received data nobody reads (the F7 keeps up to 4 bytes in its RX FIFO); then an SR read
+// clears OVR.
+static void max7456SpiDropRx(SPI_TypeDef *spi)
+{
+#if defined(STM32F7)
+    while (spi->SR & SPI_SR_FRLVL) {
+        (void)*(volatile uint8_t *)&spi->DR;
+    }
+#else
+    (void)spi->DR;
+#endif
+}
+
 // Mid-glyph hot path, write-only. The generic polled transfer sends a byte, waits for its
 // RX byte, reads it, and does it through stdperiph flag calls — ~1.25 us/byte at 13.5 MHz
 // where the wire needs 0.59 us. Writes to the MAX7456 return nothing useful, so keep TXE
@@ -1355,11 +1380,8 @@ static bool max7456SpiTxOnlyBurst(const uint8_t *buf, uint16_t len)
         }
         *(volatile uint8_t *)&spi->DR = buf[i];
     }
-    while (!(spi->SR & SPI_SR_TXE)) {
-    }
-    while (spi->SR & SPI_SR_BSY) {
-    }
-    (void)spi->DR;
+    max7456SpiDrain(spi);
+    max7456SpiDropRx(spi);
     (void)spi->SR;
     IOHi(dev->busType_u.spi.csnPin);
     return true;
@@ -1369,12 +1391,25 @@ static bool max7456SpiTxOnlyBurst(const uint8_t *buf, uint16_t len)
 // frame (DMA1 cannot write GPIO, so no per-write CS; a long frame is fine on the AT7456). The
 // demo's slot engine then writes every word by timer-paced DMA straight into SPI DR — glyphs,
 // zone registers and fillers alike — so nothing else may touch the bus until End.
-#define MAX7456_ZONE_TX_STREAM DMA1_Stream4 // SPI2_TX (kept off during the session)
 static bool zone16;
 static uint16_t zone16SavedBr; // CR1 baud bits before the session
-#define ZONE16_LIMIT_HZ 30000000u // session SPI clock limit: 27 MHz on F411, 21 MHz on F405
+#define ZONE16_LIMIT_HZ 30000000u // session SPI clock limit: 27 MHz on F411 / F7, 21 MHz on F405
 
 static uint16_t zone16SavedCr2; // CR2 DMA request bits before the session
+#if defined(STM32F7)
+static uint32_t zone16SavedDs;  // CR2 frame size and RX threshold before the session
+#endif
+
+// The bus driver's SPI streams stay off in the session.
+static void max7456SpiStreamOff(dmaChannelDescriptor_t *dma)
+{
+    if (dma) {
+        DMA_Stream_TypeDef *stream = (DMA_Stream_TypeDef *)dma->ref;
+        stream->CR &= ~DMA_SxCR_EN;
+        while (stream->CR & DMA_SxCR_EN) {
+        }
+    }
+}
 
 // The session's own SPI clock: the fastest APB / 2^(BR+1) at or under the limit.
 static uint16_t max7456SessionBr(SPI_TypeDef *spi)
@@ -1390,14 +1425,6 @@ static uint16_t max7456SessionBr(SPI_TypeDef *spi)
     return br;
 }
 
-static void max7456SpiDrain(SPI_TypeDef *spi)
-{
-    while (!(spi->SR & SPI_SR_TXE)) {
-    }
-    while (spi->SR & SPI_SR_BSY) {
-    }
-}
-
 bool max7456Zone16Active(void)
 {
     return zone16;
@@ -1409,16 +1436,20 @@ void max7456Zone16Begin(void)
     max7456SpiDrain(spi);
     spi->CR1 &= (uint16_t)~SPI_CR1_SPE;
     zone16SavedBr = spi->CR1 & SPI_CR1_BR;
+#if defined(STM32F7)
+    zone16SavedDs = spi->CR2 & (SPI_CR2_DS | SPI_CR2_FRXTH);
+    spi->CR2 = (spi->CR2 & ~(SPI_CR2_DS | SPI_CR2_FRXTH)) | SPI_CR2_DS; // 16-bit frames
+    spi->CR1 = (uint16_t)((spi->CR1 & ~SPI_CR1_BR) | (max7456SessionBr(spi) << 3));
+#else
     spi->CR1 = (uint16_t)((spi->CR1 & ~SPI_CR1_BR) | (max7456SessionBr(spi) << 3) | SPI_CR1_DFF);
+#endif
     spi->CR1 |= SPI_CR1_SPE;
-    MAX7456_ZONE_TX_STREAM->CR &= ~DMA_SxCR_EN;
-    while (MAX7456_ZONE_TX_STREAM->CR & DMA_SxCR_EN) {
-    }
+    max7456SpiStreamOff(dev->bus->dmaTx);
     // Neither SPI DMA request in the session: the slot DMA writes DR itself, and an RX stream left
     // armed by the bus driver would copy every received word into someone's buffer.
     zone16SavedCr2 = spi->CR2 & (SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN);
     spi->CR2 &= (uint16_t)~(SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN);
-    DMA1_Stream3->CR &= ~DMA_SxCR_EN; // SPI2_RX
+    max7456SpiStreamOff(dev->bus->dmaRx);
     IOLo(dev->busType_u.spi.csnPin);
     zone16 = true;
 }
@@ -1432,10 +1463,16 @@ void max7456Zone16End(void)
     max7456SpiDrain(spi);
     IOHi(dev->busType_u.spi.csnPin);
     spi->CR1 &= (uint16_t)~SPI_CR1_SPE;
+#if defined(STM32F7)
+    spi->CR1 = (uint16_t)((spi->CR1 & ~SPI_CR1_BR) | zone16SavedBr);
+    spi->CR2 = (spi->CR2 & ~(SPI_CR2_DS | SPI_CR2_FRXTH)) | zone16SavedDs;
+    max7456SpiDropRx(spi); // the session's received words
+#else
     spi->CR1 = (uint16_t)((spi->CR1 & ~(SPI_CR1_DFF | SPI_CR1_BR)) | zone16SavedBr);
     while (spi->SR & SPI_SR_RXNE) {
         (void)spi->DR; // the session's received words
     }
+#endif
     spi->SR = 0; // OVR from never reading them
     spi->CR2 = (uint16_t)(spi->CR2 | zone16SavedCr2);
     spi->CR1 |= SPI_CR1_SPE;
@@ -1574,7 +1611,7 @@ bool max7456SendEncodedDisplaySram(uint16_t len)
     if (!midGlyphSpiHot || len == 0 || len > sizeof(midGlyphRowBuf)) {
         return false;
     }
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32F7)
     if (zone16) {
         return false; // the slot engine owns the bus
     }
@@ -1584,7 +1621,7 @@ bool max7456SendEncodedDisplaySram(uint16_t len)
             return false;
         }
     }
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32F7)
     if (max7456SpiTxOnlyBurst(midGlyphRowBuf, len)) {
         return true;
     }
@@ -1658,7 +1695,7 @@ uint16_t max7456FlushDirtyBurst(void)
             c = (uint8_t)(end + 1u);
         }
         if (idx) {
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32F7)
             if (!max7456SpiTxOnlyBurst(buf, idx))
 #endif
             {

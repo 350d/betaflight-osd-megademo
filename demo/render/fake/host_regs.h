@@ -39,22 +39,7 @@ void hostPendIrq(int irq);
 #define NVIC_BUILD_PRIORITY(a, b) ((((a) << 4) | (b)) & 0xF0)
 #define NVIC_PRIORITY_BASE(p) (((p) >> 4) & 0xF)
 #define NVIC_PRIORITY_SUB(p) ((p) & 0xF)
-typedef struct { uint8_t NVIC_IRQChannel, NVIC_IRQChannelPreemptionPriority, NVIC_IRQChannelSubPriority, NVIC_IRQChannelCmd; } NVIC_InitTypeDef;
-#define NVIC_Init(x) ((void)(x))
-#define ENABLE 1
-#define DISABLE 0
-typedef struct { uint32_t TIM_Prescaler, TIM_Period, TIM_CounterMode, TIM_ClockDivision, TIM_RepetitionCounter; } TIM_TimeBaseInitTypeDef;
-typedef struct { uint32_t TIM_OCMode, TIM_OutputState, TIM_Pulse, TIM_OCPolarity, TIM_OCIdleState; } TIM_OCInitTypeDef;
-#define TIM_TimeBaseStructInit(x) ((void)(x))
-#define TIM_TimeBaseInit(t, x) ((void)(t), (void)(x))
-#define TIM_OCStructInit(x) ((void)(x))
-#define TIM_OC1Init(t, x) ((void)(t), (void)(x))
-#define TIM_ITConfig(t, i, e) ((void)(t), (void)(i), (void)(e))
-#define TIM_Cmd(t, e) ((void)(t), (void)(e))
-#define TIM_OCMode_Timing 0
-#define TIM_CounterMode_Up 0
-#define TIM_Channel_1 0
-#define TIM_IT_CC1 2
+#define TIM_DIER_CC1IE 2
 #define TIM_SR_CC1IF 2
 #define TIM_SR_CC2IF 4
 #define TIM_DIER_CC2DE (1u << 10)
@@ -67,10 +52,9 @@ typedef struct { uint32_t TIM_OCMode, TIM_OutputState, TIM_Pulse, TIM_OCPolarity
 #define TIM_CCER_CC1E (1u << 0)
 #define TIM_CCER_CC2P (1u << 5)
 #define TIM_CCER_CC2E (1u << 4)
-#define RCC_APB1Periph_TIM5 8
-#define RCC_APB1PeriphClockCmd(p, e) ((void)(p), (void)(e))
 #define RCC_APB1ENR_TIM3EN 2
 #define RCC_APB1ENR_TIM2EN 1
+#define RCC_APB1ENR_TIM5EN 8
 #define RCC_AHB1ENR_DMA1EN (1u << 21)
 #define DMA_SxCR_EN 1
 #define DMA_SxCR_TCIE (1u << 4)

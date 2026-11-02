@@ -31,9 +31,9 @@ README is [README.betaflight.md](README.betaflight.md).
 
 ## Requirements
 
-- An **STM32F4** flight controller with a **MAX7456 or AT7456E** OSD on **SPI2 or SPI3**.
-  Tested on HAKRC F411 (STM32F411, AT7456E). F405 and F446 boards build and should work, but
-  are not tested yet. F7 and H7 are not supported.
+- An **STM32F4 or STM32F7** flight controller with a **MAX7456 or AT7456E** OSD on **SPI2 or
+  SPI3**. Tested on HAKRC F411 (STM32F411, AT7456E). F405, F446, F722 and F745 boards build and
+  should work, but are not tested yet. H7 is not supported.
 - An analog **PAL** camera (the demo runs on the camera's sync). NTSC is not supported.
 - A video capture device or an analog VTX and goggles.
 - One wire for HSYNC (below). The audio wiring is optional.
@@ -48,7 +48,8 @@ README is [README.betaflight.md](README.betaflight.md).
 
 Solder **pin 18 (HSYNC) of the OSD chip** to a free pad of the flight controller that
 connects to **PA0, PA1, PA5, PA15 or PB3** (TIM2 channel 1 or 2). On many boards these are a
-UART pad (UART4 TX = PA0, RX = PA1 on F405), a soft serial pad or an unused LED / PINIO pad;
+UART pad (UART4 TX = PA0, RX = PA1 on F405 / F722), a soft serial pad or an unused LED / PINIO
+pad (PB3 is the LED pad on some F7 boards, such as HAKRCF722V2 and MAMBAF722);
 check the board's pinout or `resource` in the CLI. The pad must not be in use (no serial port
 or other function configured on it).
 
@@ -68,10 +69,19 @@ The music comes out of the **LED strip pad** as a PWM signal (32 kHz samples, a 
 carrier on TIM1 / TIM8 pins). Disconnect the LED strip while you use the demo build (the
 demo build has no LED strip support); reconnect it when you go back to normal firmware.
 
-The LED pad needs a timer channel with DMA (all Betaflight LED strip pads have one). To use
-another timer pin, build with `EXTRA_FLAGS=-DAY_PWM_PIN=PB6` (example).
+The pad needs a timer channel with DMA that the demo does not use itself (TIM2, TIM3 and TIM5
+are its own). When the LED pad is in use (for example by the HSYNC wire) or sits on one of
+those timers (PB3 = TIM2 on some F7 boards), the sound goes to an I2C pad with a suitable timer
+(SCL = PB8 on most F7 boards; the demo defaults turn the baro off), else to the first free UART
+pad that has one. `osd_demo play` prints where it is, for example:
 
-Three ways to listen, from the LED pad to ground:
+```
+osd_demo: sound on TX1 (PB6)
+```
+
+To choose the pin yourself, build with `EXTRA_FLAGS=-DAY_PWM_PIN=PB6` (example).
+
+Three ways to listen, from that pad to ground:
 
 1. **A small speaker directly** (8–32 Ω): LED pad → **270 Ω** → speaker → GND. The resistor
    keeps the pin current near 12 mA. A piezo buzzer sounds bad; use a real speaker.

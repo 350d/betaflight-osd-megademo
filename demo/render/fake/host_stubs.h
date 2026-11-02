@@ -38,13 +38,8 @@ typedef enum { OWNER_FREE = 0, OWNER_TIMER = 1, OWNER_OSD = 2 } resourceOwner_e;
 #define DEFIO_TAG_E(pin) ((ioTag_t)1)
 #define DEFIO_TAG_GPIOID(tag) 1
 #define DEFIO_TAG_PIN(tag) 3
-#define IO_CONFIG(m, s, o, p) 0
 #define IOCFG_IN_FLOATING 0
-#define GPIO_Speed_50MHz 0
-#define GPIO_PuPd_UP 0
-#define GPIO_OType_PP 0
-#define GPIO_Mode_AF 0
-#define GPIO_AF_TIM2 0
+#define IOCFG_AF_PP_UP 0
 IO_t IOGetByTag(ioTag_t tag);
 void IOInit(IO_t io, resourceOwner_e owner, uint8_t index);
 resourceOwner_e IOGetOwner(IO_t io);

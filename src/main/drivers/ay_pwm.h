@@ -24,9 +24,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "drivers/io_types.h"
+
 // The music's output: a software AY-3-8910 (drivers/ay_synth.c) as a PWM DAC on a timer pin,
 // the LED strip pad by default, the samples streamed into the timer by DMA.
 
+bool ayPwmClaim(void);                          // false: no free pad with a timer and DMA
+ioTag_t ayPwmPin(void);                         // the claimed pad, IO_TAG_NONE before
 bool ayPwmStart(void);                          // false: no timer / DMA on the pin
 void ayPwmStop(void);
 bool ayPwmIsRunning(void);

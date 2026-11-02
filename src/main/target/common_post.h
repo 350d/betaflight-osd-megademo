@@ -23,9 +23,9 @@
 #include "build/version.h"
 
 #ifdef OSD_DEMO_BUILD
-// OSD megademo build: the slot engine is STM32F4 only. Its RAM comes from blackbox (and with it
+// OSD megademo build: the slot engine runs on STM32F4 and STM32F7. Its RAM comes from blackbox (and with it
 // USB mass storage) and ESC passthrough.
-#if defined(USE_MAX7456) && defined(STM32F4)
+#if defined(USE_MAX7456) && (defined(STM32F4) || defined(STM32F7))
 #define USE_OSD_DEMO
 #define USE_CHIPTUNE
 #ifndef USE_TARGET_CONFIG
