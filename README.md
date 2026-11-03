@@ -47,6 +47,8 @@ README is [README.betaflight.md](README.betaflight.md).
 
 <img width="4032" height="3024" alt="IMG_3060" src="https://github.com/user-attachments/assets/3fa1f13f-d302-48ed-8d07-0aae2e5ac783" />
 
+<img width="2048" height="1536" alt="5A9B9E04-F067-4DD4-82D4-3DC7078328DD_1_102_o" src="https://github.com/user-attachments/assets/b66b95b7-33ca-4b1a-be2d-53a130c85b78" />
+
 Solder **pin 18 (HSYNC) of the OSD chip** to a free pad of the flight controller that
 connects to **PA0, PA1, PA5, PA15 or PB3** (TIM2 channel 1 or 2). On many boards these are a
 UART pad (UART4 TX = PA0, RX = PA1 on F405 / F722), a soft serial pad or an unused LED / PINIO
@@ -83,6 +85,9 @@ osd_demo: sound on TX1 (PB6)
 To choose the pin yourself, build with `EXTRA_FLAGS=-DAY_PWM_PIN=PB6` (example).
 
 Three ways to listen, from that pad to ground:
+
+<img width="2048" height="1536" alt="1920ED22-3027-4BAE-9701-C82D0DAA21C8_1_102_o" src="https://github.com/user-attachments/assets/77b97a7a-0a32-4167-901e-4836629a778a" />
+
 
 1. **A small speaker directly** (8–32 Ω): LED pad → **270 Ω** → speaker → GND. The resistor
    keeps the pin current near 12 mA. A piezo buzzer sounds bad; use a real speaker.
