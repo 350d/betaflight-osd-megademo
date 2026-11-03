@@ -49,7 +49,7 @@ README is [README.betaflight.md](README.betaflight.md).
 
 <img width="2048" height="1536" alt="5A9B9E04-F067-4DD4-82D4-3DC7078328DD_1_102_o" src="https://github.com/user-attachments/assets/b66b95b7-33ca-4b1a-be2d-53a130c85b78" />
 
-Solder **pin 18 (HSYNC) of the OSD chip** to a free pad of the flight controller that
+Solder **pin 18 (HSYNC) of the OSD chip** (4th pin from the right top corner) to a free pad of the flight controller that
 connects to **PA0, PA1, PA5, PA15 or PB3** (TIM2 channel 1 or 2). On many boards these are a
 UART pad (UART4 TX = PA0, RX = PA1 on F405 / F722), a soft serial pad or an unused LED / PINIO
 pad (PB3 is the LED pad on some F7 boards, such as HAKRCF722V2 and MAMBAF722);
