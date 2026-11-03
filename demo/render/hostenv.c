@@ -147,6 +147,7 @@ void max7456Zone16Begin(void) { }
 void max7456Zone16End(void) { }
 void max7456Osdm(uint8_t value) { osdmReg = value; }
 void max7456SetSyncMode(uint8_t mode) { chip.syncMode = mode; }
+bool max7456HasVideoIn(void) { return true; }
 
 bool max7456WaitVsyncFallingEdge(uint32_t *edgeTicks, timeUs_t timeoutUs)
 {

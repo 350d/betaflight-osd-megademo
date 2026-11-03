@@ -34,7 +34,8 @@ README is [README.betaflight.md](README.betaflight.md).
 - An **STM32F4 or STM32F7** flight controller with a **MAX7456 or AT7456E** OSD on **SPI2 or
   SPI3**. Tested on HAKRC F411 (STM32F411, AT7456E). F405, F446, F722 and F745 boards build and
   should work, but are not tested yet. H7 is not supported.
-- An analog **PAL** camera (the demo runs on the camera's sync). NTSC is not supported.
+- An analog **PAL** camera, or none: without a camera the OSD chip makes its own PAL signal.
+  NTSC is not supported.
 - A video capture device or an analog VTX and goggles.
 - One wire for HSYNC (below). The audio wiring is optional.
 - The demo is for the bench: it disables the motors (it borrows the DShot timer and DMA).
@@ -172,6 +173,7 @@ In the CLI:
 osd_demo              play the demo (once, then it stops)
 osd_demo stop         stop it
 osd_demo scene<0..14> run one scene and hold it
+osd_demo vsync [auto | internal | external]  sync source from the next start
 osd_demo font         show the state of the font backup
 osd_demo font restore restore Betaflight's font now
 ```
@@ -179,9 +181,10 @@ osd_demo font restore restore Betaflight's font now
 Or put the **OSD DEMO** mode on a switch in the Configurator's Modes tab: switch on plays the
 demo, switch off stops it.
 
-- **Video sync.** The demo runs on the camera's timing, so video grabbers keep their sync.
+- **Video sync.** With a camera the demo runs on its timing, so video grabbers keep their sync.
   After the intro (Betaflight's own OSD eaten by a matrix rain), cover the camera lens for a
-  black background.
+  black background. Without a camera (checked at each start) the chip's own sync is used.
+  `osd_demo vsync internal` or `external` forces one (`auto` is the default; not saved).
 - **Font.** At start the demo writes its glyphs into the OSD chip's font memory, and `stop`
   puts Betaflight's font back. On the AT7456E the backup lives in the chip's second glyph bank,
   which is RAM: it survives an FC reset or reflash, but **not a power cut**. If you unplug the

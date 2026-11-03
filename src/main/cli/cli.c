@@ -4981,6 +4981,18 @@ static void cliOsdDemo(const char *cmdName, char *cmdline)
         }
         return;
     }
+    if (strcasecmp(cmd, "vsync") == 0) {
+        static const char *const names[3] = { "auto", "internal", "external" };
+        const char *val = strtok_r(NULL, " ", &saveptr);
+        for (uint8_t i = 0; val && i < 3u; i++) {
+            if (strcasecmp(val, names[i]) == 0) {
+                osdDemoSetSyncMode(i);
+            }
+        }
+        cliPrintLinef("osd_demo vsync %s  (auto (default): the camera's when there is one, else the chip's own | internal | external; from the next demo start)",
+                      names[osdDemoGetSyncMode()]);
+        return;
+    }
     if (strcasecmp(cmd, "font") == 0) {
         const char *arg = strtok_r(NULL, " ", &saveptr);
         const bool restore = arg && strcasecmp(arg, "restore") == 0;
@@ -5007,7 +5019,7 @@ static void cliOsdDemo(const char *cmdName, char *cmdline)
         }
         return;
     }
-    cliPrintLine("usage: osd_demo [play | stop | scene<0..14> | font [restore]]");
+    cliPrintLine("usage: osd_demo [play | stop | scene<0..14> | vsync [auto | internal | external] | font [restore]]");
 }
 #endif
 
@@ -8698,7 +8710,7 @@ const clicmd_t cmdTable[] = {
     CLI_COMMAND_DEF("board_name", "get / set the name of the board model", "[board name]", cliBoardName),
 #endif
 #ifdef USE_OSD_DEMO
-    CLI_COMMAND_DEF("osd_demo", "OSD megademo on the MAX7456 / AT7456", "[play | stop | scene<0..14> | font [restore]]", cliOsdDemo),
+    CLI_COMMAND_DEF("osd_demo", "OSD megademo on the MAX7456 / AT7456", "[play | stop | scene<0..14> | vsync [auto | internal | external] | font [restore]]", cliOsdDemo),
 #endif
 #ifdef USE_LED_STRIP_STATUS_MODE
         CLI_COMMAND_DEF("color", "configure colors", NULL, cliColor),

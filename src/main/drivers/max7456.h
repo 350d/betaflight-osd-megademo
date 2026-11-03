@@ -137,6 +137,7 @@ void    max7456RbResetWanted(uint8_t reg);                       // OSD demo: ro
 void    max7456RbHold(bool hold, uint8_t flashReg);
 bool    max7456RbHeld(void);
 void    max7456SetSyncMode(uint8_t mode);                       // 0 auto, 1 internal, 2 external
+bool    max7456HasVideoIn(void);                                // the chip sees a camera (no loss of sync)
 bool    max7456IsAt7456(void);                                  // 512 glyphs (upper 256 are RAM)
 // Upper-bank test suite (`osd_demo bank ...`): prints `bank <test>: PASS|FAIL|INFO ...` lines.
 typedef void (*max7456PrintFn)(const char *fmt, ...);

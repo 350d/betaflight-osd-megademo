@@ -35,6 +35,8 @@
 bool osdDemoStart(void);                 // the whole demo, once
 bool osdDemoStartScene(uint8_t scene);   // one scene, held
 const char *osdDemoStartLastError(void); // set when a start returns false
+void osdDemoSetSyncMode(uint8_t mode);   // 0 auto (camera or own), 1 internal, 2 external
+uint8_t osdDemoGetSyncMode(void);
 const char *osdDemoSoundPad(void);       // "sound on <pad>" or why not
 void osdDemoStop(void);
 bool osdDemoIsActive(void);

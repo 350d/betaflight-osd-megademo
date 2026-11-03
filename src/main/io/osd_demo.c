@@ -9914,7 +9914,20 @@ static void osdDemoTrimAudioClock(void)
     ayPwmSetClockErrorPpm((int32_t)(((int64_t)ticks - (int64_t)nominal) * 1000000 / (int64_t)nominal));
 }
 
-// The demo proper: black, the chip's own sync, the demo font, the first scene and the music.
+static uint8_t demoSyncMode; // 0 auto: the camera's sync when the chip sees one, else its own
+
+void osdDemoSetSyncMode(uint8_t mode)
+{
+    demoSyncMode = (uint8_t)MIN(mode, 2u); // from the next demo start (the engines own the bus)
+}
+
+uint8_t osdDemoGetSyncMode(void)
+{
+    return demoSyncMode;
+}
+
+// The demo proper: black, the camera's or the chip's own sync, the demo font, the first scene
+// and the music.
 static void osdDemoStartShow(void)
 {
     max7456ResetHudMotionOffset();
@@ -9923,7 +9936,8 @@ static void osdDemoStartShow(void)
     max7456FillScreen(OSD_DEMO_PIXEL_OFF);
     max7456RefreshAll();
 
-    max7456SetSyncMode(2); // before the font re-inits: they keep it
+    // Before the font re-inits: they keep it. No camera: external sync would leave no picture.
+    max7456SetSyncMode(demoSyncMode ? demoSyncMode : max7456HasVideoIn() ? 2 : 1);
     osdDemoFontBackup(); // the user's font → the upper 256 glyphs (AT7456)
     const bool fontOk = osdDemoInstallFont();
     if (!fontOk) {

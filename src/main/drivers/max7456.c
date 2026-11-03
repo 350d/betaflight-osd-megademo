@@ -413,6 +413,12 @@ uint8_t max7456GetHosApplied(void)
 static void max7456NvmWaitIdle(void);
 static bool max7456WaitSpiIdle(void);
 
+// A camera on the video input: STAT[2] LOS clear (PAL / NTSC bits alone read zero on some clones).
+bool max7456HasVideoIn(void)
+{
+    return max7456DeviceDetected && max7456WaitSpiIdle() && !STAT_IS_LOS(spiReadRegMsk(dev, MAX7456ADD_STAT));
+}
+
 // Sync source, VM0[5:4]: SYNC_MODE_AUTO (BF default), _INTERNAL (the chip's own PAL/NTSC timing,
 // no camera picture — a steady signal for capture / HDMI adapters that lose lock on the camera's)
 // or _EXTERNAL. Applied now when the bus is free, and by every re-init.
